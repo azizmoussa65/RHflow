@@ -228,7 +228,9 @@
 </template>
 
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
+import employeService from '@/services/employeService.js'
+import congeService from '@/services/congeService.js'
 
 const toast = inject('toast')
 
@@ -236,34 +238,106 @@ const toast = inject('toast')
 const filterDept    = ref('')
 const filterPeriode = ref('mois')
 const filterStatut  = ref('')
-const departements  = ['Développement','Marketing','Design','Finance','RH']
 function resetFilters() { filterDept.value = ''; filterPeriode.value = 'mois'; filterStatut.value = '' }
 
-/* ── Stats cards ─────────────────────────── */
-const stats = ref({ totalEmployes:24, presents:18, absents:3, congesEnAttente:5 })
+/* ── Données réelles ─────────────────────── */
+const employesList = ref([])
+const congesList   = ref([])
+const loading      = ref(false)
 
-/* ── Présence/Absence par mois ───────────── */
-const presenceData = [
-  { mois:'Jan', presents:21, absents:3 },
-  { mois:'Fév', presents:19, absents:5 },
-  { mois:'Mar', presents:20, absents:4 },
-  { mois:'Avr', presents:22, absents:2 },
-  { mois:'Mai', presents:18, absents:6 },
-  { mois:'Jun', presents:20, absents:4 },
-  { mois:'Jul', presents:17, absents:7 },
-  { mois:'Aoû', presents:15, absents:9 },
+const departements = computed(() => {
+  const set = new Set(employesList.value.map(e => e.departement).filter(Boolean))
+  return [...set]
+})
+
+const DEPT_COLORS = [
+  'linear-gradient(90deg,#3b82f6,#06b6d4)', 'linear-gradient(90deg,#8b5cf6,#a78bfa)',
+  'linear-gradient(90deg,#06b6d4,#22d3ee)', 'linear-gradient(90deg,#10b981,#34d399)',
+  'linear-gradient(90deg,#ef4444,#f87171)', 'linear-gradient(90deg,#f59e0b,#fbbf24)',
 ]
-const maxPresence = computed(() => Math.max(...presenceData.map(m => m.presents)))
+const AVATAR_COLORS = [
+  'linear-gradient(135deg,#3b82f6,#06b6d4)', 'linear-gradient(135deg,#8b5cf6,#a78bfa)',
+  'linear-gradient(135deg,#10b981,#34d399)', 'linear-gradient(135deg,#f59e0b,#fbbf24)',
+  'linear-gradient(135deg,#ef4444,#f87171)', 'linear-gradient(135deg,#06b6d4,#67e8f9)',
+]
+function colorFor(id, palette) {
+  let sum = 0
+  for (const ch of String(id || '')) sum += ch.charCodeAt(0)
+  return palette[sum % palette.length]
+}
+
+/** Parse the API's 'dd/mm/yyyy' date strings (returns null if absent/invalid). */
+function parseFR(str) {
+  if (!str) return null
+  const [d, m, y] = str.split('/').map(Number)
+  if (!d || !m || !y) return null
+  return new Date(y, m - 1, d)
+}
+
+const MOIS_FR = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
+const MOIS_FR_LONG = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
+
+/** Employees with at least one APPROVED congé covering the given date. */
+function employeesOnLeave(date) {
+  const ids = new Set()
+  for (const c of congesList.value) {
+    if (c.statut !== 'APPROUVE') continue
+    const debut = parseFR(c.dateDebut)
+    const fin = parseFR(c.dateFin)
+    if (!debut || !fin) continue
+    if (date >= debut && date <= fin) ids.add(c.employeId)
+  }
+  return ids
+}
+
+/* ── Stats cards ─────────────────────────── */
+const stats = computed(() => {
+  const total = employesList.value.length
+  const absents = employeesOnLeave(new Date()).size
+  return {
+    totalEmployes: total,
+    presents: Math.max(0, total - absents),
+    absents,
+    congesEnAttente: congesList.value.filter(c => c.statut === 'EN_ATTENTE').length,
+  }
+})
+
+/* ── Présence/Absence par mois (approximée à partir des congés approuvés) ── */
+const presenceData = computed(() => {
+  const total = employesList.value.length
+  const months = []
+  const now = new Date()
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({ year: d.getFullYear(), month: d.getMonth() })
+  }
+  return months.map(({ year, month }) => {
+    const monthStart = new Date(year, month, 1)
+    const monthEnd = new Date(year, month + 1, 0)
+    const absentIds = new Set()
+    for (const c of congesList.value) {
+      if (c.statut !== 'APPROUVE') continue
+      const debut = parseFR(c.dateDebut)
+      const fin = parseFR(c.dateFin)
+      if (!debut || !fin) continue
+      if (debut <= monthEnd && fin >= monthStart) absentIds.add(c.employeId)
+    }
+    const absents = absentIds.size
+    return { mois: MOIS_FR[month], presents: Math.max(0, total - absents), absents }
+  })
+})
+const maxPresence = computed(() => Math.max(1, ...presenceData.value.flatMap(m => [m.presents, m.absents])))
 
 /* ── Congés par type (donut) ─────────────── */
-const congesParType = ref([
-  { type:'Annuel',             count:12, color:'#3b82f6' },
-  { type:'Maladie',            count: 7, color:'#ef4444' },
-  { type:'Maternité/Paternité',count: 3, color:'#8b5cf6' },
-  { type:'Exceptionnel',       count: 4, color:'#f59e0b' },
-])
+const TYPE_COLORS = { 'Annuel':'#3b82f6', 'Maladie':'#ef4444', 'Maternité/Paternité':'#8b5cf6', 'Exceptionnel':'#f59e0b' }
+const congesParType = computed(() => {
+  const counts = {}
+  for (const c of congesList.value) counts[c.type] = (counts[c.type] || 0) + 1
+  return Object.entries(counts).map(([type, count]) => ({ type, count, color: TYPE_COLORS[type] || '#64748b' }))
+})
 const totalConges = computed(() => congesParType.value.reduce((s,x) => s + x.count, 0))
 const donutConges = computed(() => {
+  if (totalConges.value === 0) return 'conic-gradient(#e2e8f0 0deg 360deg)'
   let deg = 0
   const segs = congesParType.value.map(t => {
     const end = deg + (t.count / totalConges.value * 360)
@@ -274,50 +348,78 @@ const donutConges = computed(() => {
   return `conic-gradient(${segs.join(', ')})`
 })
 
-/* ── Statistiques congés par période ────── */
-const statsParPeriode = [
-  { periode:'Janvier 2025',  annuel:4, maladie:2, exceptionnel:1 },
-  { periode:'Février 2025',  annuel:3, maladie:3, exceptionnel:0 },
-  { periode:'Mars 2025',     annuel:5, maladie:1, exceptionnel:2 },
-  { periode:'Avril 2025',    annuel:6, maladie:2, exceptionnel:1 },
-  { periode:'Mai 2025',      annuel:4, maladie:3, exceptionnel:0 },
-]
+/* ── Statistiques congés par période (6 derniers mois, par type) ── */
+const statsParPeriode = computed(() => {
+  const now = new Date()
+  const buckets = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    buckets.push({ year: d.getFullYear(), month: d.getMonth(), periode: `${MOIS_FR_LONG[d.getMonth()]} ${d.getFullYear()}`, annuel: 0, maladie: 0, exceptionnel: 0 })
+  }
+  for (const c of congesList.value) {
+    const debut = parseFR(c.dateDebut)
+    if (!debut) continue
+    const bucket = buckets.find(b => b.year === debut.getFullYear() && b.month === debut.getMonth())
+    if (!bucket) continue
+    if (c.type === 'Annuel') bucket.annuel++
+    else if (c.type === 'Maladie') bucket.maladie++
+    else if (c.type === 'Exceptionnel') bucket.exceptionnel++
+  }
+  return buckets
+})
 
 /* ── Liste des demandes de congés ────────── */
-const toutesConges = ref([
-  { id:1, employe:'Yassine Aouat',  initials:'YA', type:'Annuel',  nbJours:5,  dept:'Développement', statut:'EN_ATTENTE', color:'linear-gradient(135deg,#8b5cf6,#a78bfa)' },
-  { id:2, employe:'Karima Belhadj', initials:'KB', type:'Maladie', nbJours:3,  dept:'Marketing',     statut:'EN_ATTENTE', color:'linear-gradient(135deg,#06b6d4,#22d3ee)' },
-  { id:3, employe:'Sana Mrad',      initials:'SM', type:'Annuel',  nbJours:10, dept:'Design',        statut:'APPROUVE',   color:'linear-gradient(135deg,#10b981,#34d399)' },
-  { id:4, employe:'Mehdi Khelifi',  initials:'MK', type:'Exceptionnel', nbJours:3, dept:'Finance',   statut:'REFUSE',     color:'linear-gradient(135deg,#f59e0b,#fbbf24)' },
-  { id:5, employe:'Lina Bouzid',    initials:'LB', type:'Annuel',  nbJours:7,  dept:'Développement', statut:'APPROUVE',   color:'linear-gradient(135deg,#ef4444,#f87171)' },
-  { id:6, employe:'Omar Trabelsi',  initials:'OT', type:'Maladie', nbJours:2,  dept:'RH',            statut:'EN_ATTENTE', color:'linear-gradient(135deg,#3b82f6,#60a5fa)' },
-])
-
 const filteredConges = computed(() => {
-  return toutesConges.value.filter(c => {
-    if (filterDept.value   && c.dept   !== filterDept.value)   return false
-    if (filterStatut.value && c.statut !== filterStatut.value) return false
-    return true
-  })
+  const deptById = new Map(employesList.value.map(e => [e.id, e.departement]))
+  return congesList.value
+    .map(c => ({
+      ...c,
+      dept: deptById.get(c.employeId) || '—',
+      color: colorFor(c.employeId, AVATAR_COLORS),
+    }))
+    .filter(c => {
+      if (filterDept.value   && c.dept   !== filterDept.value)   return false
+      if (filterStatut.value && c.statut !== filterStatut.value) return false
+      return true
+    })
 })
 
 const statutBadge = (s) => ({ EN_ATTENTE:'badge-amber', APPROUVE:'badge-green', REFUSE:'badge-red' }[s] || 'badge-slate')
 const statutLabel = (s) => ({ EN_ATTENTE:'En attente', APPROUVE:'Approuvé', REFUSE:'Refusé' }[s] || s)
 
 /* ── Taux de présence par département ────── */
-const presenceDepts = ref([
-  { nom:'Développement', presents:7, total:8,  taux:88, color:'linear-gradient(90deg,#3b82f6,#06b6d4)' },
-  { nom:'Marketing',     presents:4, total:5,  taux:80, color:'linear-gradient(90deg,#8b5cf6,#a78bfa)' },
-  { nom:'Design',        presents:3, total:4,  taux:75, color:'linear-gradient(90deg,#06b6d4,#22d3ee)' },
-  { nom:'Finance',       presents:3, total:3,  taux:100,color:'linear-gradient(90deg,#10b981,#34d399)' },
-  { nom:'RH',            presents:1, total:3,  taux:33, color:'linear-gradient(90deg,#ef4444,#f87171)' },
-])
+const presenceDepts = computed(() => {
+  const onLeaveToday = employeesOnLeave(new Date())
+  return departements.value.map(nom => {
+    const membres = employesList.value.filter(e => e.departement === nom)
+    const total = membres.length
+    const absents = membres.filter(e => onLeaveToday.has(e.id)).length
+    const presents = total - absents
+    return {
+      nom, presents, total,
+      taux: total > 0 ? Math.round(presents / total * 100) : 0,
+      color: colorFor(nom, DEPT_COLORS),
+    }
+  })
+})
 
 const filteredDepts = computed(() =>
   filterDept.value ? presenceDepts.value.filter(d => d.nom === filterDept.value) : presenceDepts.value
 )
 
 function exportRapport() { toast.info('Export', 'Génération du rapport RH en cours...') }
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const [emp, conges] = await Promise.all([employeService.getAll(), congeService.getAll()])
+    if (emp) employesList.value = emp
+    if (conges) congesList.value = conges
+  } catch (_) {
+    toast.error('Erreur serveur', 'Impossible de charger les données du tableau de bord.')
+  }
+  loading.value = false
+})
 </script>
 
 <style scoped>

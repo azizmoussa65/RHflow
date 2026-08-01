@@ -146,15 +146,7 @@ const form = ref({ id: null, employeId: null, employeName: '', type: 'CDI', sala
 const showRenewModal = ref(false)
 const renewForm = ref(null)
 
-const DEMO_EMPLOYES = [
-  { id: 3, name: 'Karima Belhadj' },
-  { id: 4, name: 'Yassine Aouat' },
-  { id: 5, name: 'Sana Mrad' },
-  { id: 6, name: 'Mehdi Khelifi' },
-  { id: 7, name: 'Lina Bouzid' },
-  { id: 8, name: 'Employé Demo' },
-]
-const employesList = ref(DEMO_EMPLOYES)
+const employesList = ref([])
 
 const AVATAR_COLORS = [
   'linear-gradient(135deg,#3b82f6,#06b6d4)',
@@ -168,13 +160,7 @@ function empColor(initials) {
   return AVATAR_COLORS[idx]
 }
 
-const contrats = ref([
-  {id:1,employe:'Karima Belhadj',initials:'KB',color:'linear-gradient(135deg,#3b82f6,#06b6d4)',type:'CDI',dateDebut:'01/01/2024',dateFin:'',salaire:'3 200',statut:'Actif',expireBientot:false},
-  {id:2,employe:'Sana Mrad',     initials:'SM',color:'linear-gradient(135deg,#10b981,#34d399)',type:'CDD',dateDebut:'01/06/2024',dateFin:'31/05/2025',salaire:'2 400',statut:'Expire bientôt',expireBientot:true},
-  {id:3,employe:'Lina Bouzid',   initials:'LB',color:'linear-gradient(135deg,#ef4444,#f87171)',type:'Stage',dateDebut:'01/02/2025',dateFin:'31/07/2025',salaire:'600',statut:'Actif',expireBientot:false},
-  {id:4,employe:'Yassine Aouat', initials:'YA',color:'linear-gradient(135deg,#8b5cf6,#a78bfa)',type:'CDI',dateDebut:'01/03/2023',dateFin:'',salaire:'2 900',statut:'Actif',expireBientot:false},
-  {id:5,employe:'Mehdi Khelifi', initials:'MK',color:'linear-gradient(135deg,#f59e0b,#fbbf24)',type:'CDI',dateDebut:'01/09/2021',dateFin:'',salaire:'4 100',statut:'Actif',expireBientot:false},
-])
+const contrats = ref([])
 
 const cdiCount  = computed(() => contrats.value.filter(c => c.type === 'CDI').length)
 const cddCount  = computed(() => contrats.value.filter(c => c.type === 'CDD').length)
@@ -296,21 +282,21 @@ async function saveContrat() {
     toast.success('Succès', 'Contrat enregistré en base de données.')
     showModal.value = false
   } catch (_) {
-    toast.error('Erreur serveur', 'Vérifiez que le backend est lancé (php -S localhost:8000 -t public).')
+    toast.error('Erreur serveur', 'Vérifiez que le backend est lancé (python run.py).')
   }
 }
 
 onMounted(async () => {
   try {
     const emp = await employeService.getAll()
-    if (emp?.length) {
+    if (emp) {
       employesList.value = emp.map(e => ({ id: e.id, name: `${e.prenom} ${e.nom}` }))
     }
   } catch (_) {}
 
   try {
     const d = await contratService.getAll()
-    if (d?.length) contrats.value = d
+    if (d) contrats.value = d
   } catch (_) {}
 })
 </script>

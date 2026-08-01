@@ -51,17 +51,19 @@
       <div style="position:relative">
         <button class="icon-btn" @click="showNotifs = !showNotifs" title="Notifications">
           <i class="fa-solid fa-bell" style="font-size:17px"></i>
-          <span v-if="notifications.length > 0" class="notif-dot"></span>
+          <span v-if="notifStore.unreadCount > 0" class="notif-dot">{{ notifStore.unreadCount }}</span>
+          <span v-else-if="allNotifs.length > 0" class="notif-dot"></span>
         </button>
 
         <div v-if="showNotifs" class="notif-dropdown" @click.stop>
           <div style="font-size:13px;font-weight:600;color:var(--text-primary);padding:12px 16px;border-bottom:1px solid var(--border)">
             <i class="fa-solid fa-bell" style="margin-right:8px;color:#3b82f6"></i>Notifications
           </div>
-          <div v-if="notifications.length === 0" style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
+          <div v-if="allNotifs.length === 0" style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
             Aucune notification
           </div>
-          <div v-for="n in notifications" :key="n.id" class="notif-item" :class="{ 'notif-urgent': n.urgent }">
+          <div v-for="n in allNotifs" :key="n.key" class="notif-item" :class="{ 'notif-urgent': n.urgent }"
+            :style="n.real ? 'cursor:pointer' : ''" @click="n.real && onNotifClick(n)">
             <div style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0"
               :style="{ background: n.urgent ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)' }">
               <i :class="n.icon" :style="{ color: n.urgent ? '#ef4444' : '#3b82f6', fontSize:'14px' }"></i>
@@ -70,6 +72,7 @@
               <div style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ n.titre }}</div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:2px">{{ n.message }}</div>
             </div>
+            <span v-if="n.real && !n.readState" style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-top:4px"></span>
           </div>
           <div style="padding:10px 16px;border-top:1px solid var(--border)">
             <RouterLink to="/calendrier" style="font-size:12px;color:#3b82f6;text-decoration:none" @click="showNotifs=false">
@@ -81,55 +84,45 @@
 
       <!-- Messages -->
       <div style="position:relative">
-        <button class="icon-btn" @click="showMessages = !showMessages; unreadMsg = 0" title="Messages">
+        <button class="icon-btn" @click="toggleMessages" title="Messages">
           <i class="fa-solid fa-envelope" style="font-size:17px"></i>
-          <span v-if="unreadMsg > 0" class="notif-dot" style="background:#3b82f6">{{ unreadMsg }}</span>
+          <span v-if="totalUnread > 0" class="notif-dot" style="background:#3b82f6">{{ totalUnread }}</span>
         </button>
 
         <div v-if="showMessages" class="notif-dropdown" style="width:360px" @click.stop>
           <!-- Header -->
           <div style="font-size:13px;font-weight:600;color:var(--text-primary);padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-            <span><i class="fa-solid fa-envelope" style="margin-right:8px;color:#3b82f6"></i>Messages internes</span>
-            <button @click="showCompose=!showCompose" style="font-size:11px;background:rgba(59,130,246,0.1);color:#3b82f6;border:none;border-radius:6px;padding:4px 10px;cursor:pointer">
+            <span><i class="fa-solid fa-envelope" style="margin-right:8px;color:#3b82f6"></i>Messages</span>
+            <RouterLink to="/messages" style="font-size:11px;background:rgba(59,130,246,0.1);color:#3b82f6;border-radius:6px;padding:4px 10px;text-decoration:none" @click="showMessages=false">
               <i class="fa-solid fa-pen"></i> Nouveau
-            </button>
+            </RouterLink>
           </div>
 
-          <!-- Formulaire composer -->
-          <div v-if="showCompose" style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg-elevated)">
-            <select v-model="newMsg.to" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:12px;margin-bottom:8px">
-              <option value="">— Destinataire —</option>
-              <option v-for="e in contactsList" :key="e.id" :value="e.name">{{ e.name }}</option>
-            </select>
-            <textarea v-model="newMsg.body" rows="2" placeholder="Votre message..."
-              style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:12px;resize:none;margin-bottom:8px"></textarea>
-            <div class="flex gap-2">
-              <button @click="envoyerMessage" style="flex:1;padding:6px;border-radius:8px;background:#3b82f6;color:#fff;border:none;cursor:pointer;font-size:12px">
-                <i class="fa-solid fa-paper-plane"></i> Envoyer
-              </button>
-              <button @click="showCompose=false" style="padding:6px 12px;border-radius:8px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;font-size:12px">Annuler</button>
-            </div>
-          </div>
-
-          <!-- Liste messages -->
-          <div v-if="messages.length === 0" style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
+          <!-- Liste conversations -->
+          <div v-if="conversations.length === 0" style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
             <i class="fa-solid fa-inbox" style="font-size:24px;display:block;margin-bottom:8px;opacity:0.3"></i>
             Aucun message
           </div>
-          <div v-for="m in messages" :key="m.id"
-            class="notif-item"
-            :style="m.lu ? '' : 'background:rgba(59,130,246,0.05)'">
+          <div v-for="c in conversations" :key="c.id"
+            class="notif-item" style="cursor:pointer"
+            :style="c.unreadCount > 0 ? 'background:rgba(59,130,246,0.05)' : ''"
+            @click="openConversation(c)">
             <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#6366f1);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;color:#fff">
-              {{ m.initials }}
+              {{ c.otherUser?.initials }}
             </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;justify-content:space-between;align-items:center">
-                <div style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ m.de }}</div>
-                <div style="font-size:10px;color:var(--text-muted)">{{ m.heure }}</div>
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ c.otherUser?.prenom }} {{ c.otherUser?.nom }}</div>
+                <div style="font-size:10px;color:var(--text-muted)">{{ timeAgo(c.lastMessageAt) }}</div>
               </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{{ m.body }}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{{ c.lastMessageText || 'Aucun message' }}</div>
             </div>
-            <span v-if="!m.lu" style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-left:4px"></span>
+            <span v-if="c.unreadCount > 0" style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-left:4px"></span>
+          </div>
+          <div style="padding:10px 16px;border-top:1px solid var(--border)">
+            <RouterLink to="/messages" style="font-size:12px;color:#3b82f6;text-decoration:none" @click="showMessages=false">
+              Voir tous les messages →
+            </RouterLink>
           </div>
         </div>
       </div>
@@ -143,7 +136,10 @@
         </Transition>
       </button>
 
-      <div class="user-avatar" style="cursor:pointer" :title="auth.userFullName">{{ auth.userInitials }}</div>
+      <div class="user-avatar" style="cursor:pointer;overflow:hidden" :title="auth.userFullName">
+        <img v-if="photoUrl" :src="photoUrl" style="width:100%;height:100%;object-fit:cover" />
+        <template v-else>{{ auth.userInitials }}</template>
+      </div>
     </div>
   </header>
 
@@ -157,48 +153,46 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useThemeStore } from '@/stores/theme.js'
 import { useAuthStore } from '@/stores/auth.js'
+import { useMessagingStore } from '@/stores/messaging.js'
+import { useNotificationStore } from '@/stores/notifications.js'
 import employeService from '@/services/employeService.js'
 import projetService   from '@/services/projetService.js'
+import { avatarUrl } from '@/utils/avatar.js'
 
-const theme  = useThemeStore()
-const auth   = useAuthStore()
-const router = useRouter()
+const theme     = useThemeStore()
+const auth      = useAuthStore()
+const router    = useRouter()
+const messaging = useMessagingStore()
+const notifStore = useNotificationStore()
+const photoUrl  = computed(() => avatarUrl(auth.user))
 
 const searchQuery  = ref('')
 const showNotifs   = ref(false)
 const showResults  = ref(false)
 const showMessages = ref(false)
-const showCompose  = ref(false)
-const unreadMsg    = ref(2)
-const newMsg       = ref({ to: '', body: '' })
 
-const messages = ref([
-  { id:1, de:'Omar Trabelsi',   initials:'OT', body:'Bonjour, pouvez-vous valider la demande de congé de Sana ?', heure:'09:14', lu:false },
-  { id:2, de:'Marwen Ghribbi',  initials:'MG', body:'Le rapport mensuel RH est prêt pour révision.', heure:'08:30', lu:false },
-  { id:3, de:'Lina Bouzid',     initials:'LB', body:'Ma fiche de paie du mois d\'avril est manquante.', heure:'Hier', lu:true },
-])
+const conversations = computed(() => messaging.conversations)
+const totalUnread   = computed(() => messaging.totalUnread)
 
-const contactsList = ref([
-  { id:1, name:'Omar Trabelsi' },
-  { id:2, name:'Marwen Ghribbi' },
-  { id:3, name:'Sana Mrad' },
-  { id:4, name:'Mehdi Khelifi' },
-  { id:5, name:'Lina Bouzid' },
-])
-
-function envoyerMessage() {
-  if (!newMsg.value.to || !newMsg.value.body.trim()) return
-  messages.value.unshift({
-    id: Date.now(),
-    de: 'Moi → ' + newMsg.value.to,
-    initials: (auth.userInitials || 'ME'),
-    body: newMsg.value.body,
-    heure: new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }),
-    lu: true,
-  })
-  newMsg.value = { to: '', body: '' }
-  showCompose.value = false
+function toggleMessages() {
+  showMessages.value = !showMessages.value
+  if (showMessages.value) messaging.refresh()
 }
+
+function openConversation(c) {
+  showMessages.value = false
+  router.push({ path: '/messages', query: { conversationId: c.id } })
+}
+
+function timeAgo(iso) {
+  if (!iso) return ''
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000
+  if (diff < 60) return 'à l\'instant'
+  if (diff < 3600) return Math.floor(diff / 60) + ' min'
+  if (diff < 86400) return Math.floor(diff / 3600) + ' h'
+  return Math.floor(diff / 86400) + ' j'
+}
+
 const searchResults = ref([])
 
 // ── Pages navigables ─────────────────────────────────────────────────
@@ -226,6 +220,8 @@ onMounted(async () => {
   try { employesData.value = await employeService.getAll() } catch (_) {}
   try { const d = await projetService.getAll(); projetsData.value = Array.isArray(d) ? d : (d.data || []) } catch (_) {}
   loadNotifs()
+  messaging.refresh()
+  messaging.listen()
 })
 
 // ── Recherche ─────────────────────────────────────────────────────────
@@ -325,7 +321,7 @@ const JOURS_FERIES = {
   '05-01':'Fête du Travail','07-25':'Fête de la République','08-13':'Fête de la Femme',
   '10-15':"Fête de l'Évacuation",'11-07':'Fête du 7 Novembre',
 }
-const notifications = ref([])
+const holidayNotifs = ref([])
 
 function loadNotifs() {
   const today = new Date()
@@ -344,7 +340,35 @@ function loadNotifs() {
       notifs.push({ id:key, urgent:false, icon:'fa-solid fa-calendar',      titre:nom,                  message:`Dans ${dans} jours — ${date.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})}` })
     }
   }
-  notifications.value = notifs.sort((a,b) => a.urgent===b.urgent?0:a.urgent?-1:1)
+  holidayNotifs.value = notifs.sort((a,b) => a.urgent===b.urgent?0:a.urgent?-1:1)
+}
+
+// ── Notifications réelles (congés, etc.) + fériés fusionnées ──────────
+const NOTIF_ICONS = {
+  conge_submitted: 'fa-solid fa-umbrella-beach',
+  conge_approved: 'fa-solid fa-circle-check',
+  conge_refused: 'fa-solid fa-circle-xmark',
+}
+const allNotifs = computed(() => {
+  const real = notifStore.items.map(n => ({
+    key: 'real-' + n.id,
+    id: n.id,
+    real: true,
+    readState: n.read,
+    urgent: !n.read,
+    icon: NOTIF_ICONS[n.type] || 'fa-solid fa-bell',
+    titre: n.title,
+    message: n.message,
+    link: n.link,
+  }))
+  const holidays = holidayNotifs.value.map(n => ({ ...n, key: 'holiday-' + n.id, real: false }))
+  return [...real, ...holidays]
+})
+
+function onNotifClick(n) {
+  notifStore.markRead(n.id)
+  showNotifs.value = false
+  if (n.link) router.push(n.link)
 }
 </script>
 

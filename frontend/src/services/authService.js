@@ -17,6 +17,19 @@ const authService = {
   async me() {
     const response = await api.get('/auth/me')
     return response.data
+  },
+
+  /**
+   * POST /api/auth/avatar (multipart)
+   * Returns the updated user object with avatarUrl set
+   */
+  async uploadAvatar(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post('/auth/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
   }
 }
 

@@ -2,12 +2,13 @@
 
 ## Structure du projet
 ```
-PFE/
+HRFLOW/
 ├── frontend/     ← Vue 3 + Vite (port 5173)
-├── backend/      ← Symfony 7 (port 8000)
-│   └── database/
-│       └── schema.sql  ← Schéma MySQL complet
-└── index.html    ← Design original (référence)
+├── backend/      ← Flask + MongoDB (port 8000)
+│   ├── app/            ← code de l'application (routes, modèles, config)
+│   ├── seed.py          ← crée les comptes admin/rh de base
+│   └── requirements.txt
+└── start.bat     ← lance tout (Mongo + backend + frontend)
 ```
 
 ---
@@ -15,12 +16,10 @@ PFE/
 ## 🖥️ Prérequis
 
 | Outil        | Version minimale |
-|--------------|-----------------|
-| Node.js      | 18+             |
-| PHP          | 8.1+            |
-| Composer     | 2+              |
-| Symfony CLI  | 5+              |
-| MySQL        | 8.0+            |
+|--------------|-------------------|
+| Node.js      | 18+               |
+| Python       | 3.10+              |
+| MongoDB      | service local (ex: MongoDB Community Server) sur le port 27017 |
 
 ---
 
@@ -28,58 +27,42 @@ PFE/
 
 ```bash
 cd frontend
-
-# 1. Installer les dépendances
 npm install
-
-# 2. Lancer le serveur de développement
 npm run dev
 # ► http://localhost:5173
 ```
 
 ---
 
-## ⚙️ Backend — Symfony
+## ⚙️ Backend — Flask + MongoDB
 
-### 1. Installer les dépendances PHP
+### 1. MongoDB
+Assurez-vous qu'un serveur MongoDB tourne sur `localhost:27017` (service Windows,
+ou toute autre installation locale). Rien à lancer manuellement si c'est déjà un service.
+
+### 2. Créer l'environnement virtuel et installer les dépendances
 ```bash
-cd backend
-composer install
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+pip install -r requirements.txt
 ```
 
-### 2. Créer la base de données MySQL
-```sql
--- Dans phpMyAdmin ou MySQL Workbench :
-CREATE DATABASE hrflow_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
--- Puis importer : backend/database/schema.sql
-```
-
-### 3. Configurer `.env` (si besoin)
-```env
-# Modifier si votre MySQL n'est pas root sans mot de passe :
-DATABASE_URL="mysql://root:VOTRE_MDP@127.0.0.1:3306/hrflow_db?serverVersion=8.0"
-```
-
-### 4. Générer les migrations et les tables
+### 3. Configurer `.env`
 ```bash
-php bin/console doctrine:database:create
-php bin/console doctrine:migrations:diff
-php bin/console doctrine:migrations:migrate
+copy .env.example .env
+```
+Le fichier `.env.example` contient déjà des valeurs de développement fonctionnelles
+(`MONGO_URI=mongodb://localhost:27017/hrflow`). Renseignez `GROQ_API_KEY` si vous
+utilisez le chatbot.
+
+### 4. Initialiser les comptes de base (aucun employé)
+```bash
+python seed.py
 ```
 
-### 5. Générer les clés JWT
+### 5. Lancer le serveur Flask
 ```bash
-php bin/console lexik:jwt:generate-keypair
-```
-
-### 6. Charger les données de démonstration
-```bash
-php bin/console doctrine:fixtures:load
-```
-
-### 7. Lancer le serveur Symfony
-```bash
-symfony server:start
+python run.py
 # ► http://localhost:8000
 ```
 
@@ -87,11 +70,15 @@ symfony server:start
 
 ## 🔑 Comptes de démonstration
 
-| Rôle           | Email                  | Mot de passe |
-|----------------|------------------------|--------------|
-| Manager        | manager@hrflow.tn      | password     |
-| Responsable RH | rh@hrflow.tn           | password     |
-| Employé        | employe@hrflow.tn      | password     |
+| Rôle           | Email                          | Mot de passe  |
+|----------------|---------------------------------|---------------|
+| Admin          | admin@satisfyinsight.cm         | password123   |
+| Responsable RH | rh@satisfyinsight.com           | password123   |
+
+Aucun employé n'existe par défaut : l'Admin (ou le RH) doit ajouter les employés
+depuis l'écran **Employés** de l'application.
+
+⚠️ Changez ces mots de passe après la première connexion (page Profil).
 
 ---
 
@@ -107,13 +94,13 @@ symfony server:start
 |---------|----------------------------|-----------------|
 | POST    | /api/auth/login            | PUBLIC          |
 | GET     | /api/auth/me               | Authentifié     |
-| GET     | /api/employes              | Manager, RH     |
-| POST    | /api/employes              | Manager, RH     |
-| PATCH   | /api/conges/{id}/approve   | Manager, RH     |
-| PATCH   | /api/conges/{id}/refuse    | Manager, RH     |
-| GET     | /api/dashboard/stats       | Manager, RH     |
+| GET     | /api/employes              | Admin, RH       |
+| POST    | /api/employes              | Admin, RH       |
+| PATCH   | /api/conges/{id}/approve   | Admin, RH       |
+| PATCH   | /api/conges/{id}/refuse    | Admin, RH       |
+| GET     | /api/dashboard/stats       | Admin, RH       |
 | POST    | /api/conges                | Tous            |
-| POST    | /api/dossiers              | Tous            |
+| POST    | /api/dossiers               | Tous            |
 
 ---
 
@@ -124,16 +111,38 @@ src/
 ├── assets/main.css        ← Système de design (dark + light mode)
 ├── stores/
 │   ├── auth.js            ← JWT, rôle, login/logout
-│   └── theme.js           ← Bascule dark/light
-├── services/              ← Appels API Axios (1 fichier par module)
-├── router/index.js        ← Guards basés sur le rôle
+│   └── theme.js            ← Bascule dark/light
+├── services/                ← Appels API Axios (1 fichier par module)
+├── router/index.js          ← Guards basés sur le rôle
 ├── views/
-│   ├── auth/LoginView.vue ← 3 onglets rôle + remplissage démo
-│   ├── manager/           ← Dashboard, Évaluations
-│   ├── rh/                ← Contrats, Congés (approbation), Dossiers
-│   ├── employe/           ← Congés perso, Dossiers perso
-│   └── shared/            ← Employés, Projets, Profil, Paramètres
+│   ├── admin/                ← Dashboard, Évaluations
+│   ├── rh/                   ← Contrats, Congés (approbation), Dossiers
+│   ├── employe/               ← Congés perso, Dossiers perso
+│   └── shared/                ← Employés, Projets, Profil, Paramètres
 └── components/
-    ├── layout/            ← AppLayout (sidebar rôle), Topbar
-    └── shared/            ← StatCard, ModalBase, ToastNotification
+    ├── layout/                ← AppLayout (sidebar rôle), Topbar
+    └── shared/                 ← StatCard, ModalBase, ToastNotification
 ```
+
+## 🏗️ Architecture Backend (Flask + MongoDB)
+
+```
+backend/app/
+├── config.py           ← Variables d'environnement
+├── extensions.py        ← Connexion MongoDB, JWT
+├── serializers.py        ← Conversion des documents Mongo → JSON
+├── utils.py               ← ObjectId, dates, décorateur de rôles
+└── routes/
+    ├── auth.py             ← login, /me, profil
+    ├── employes.py          ← CRUD employés (rôle EMPLOYE)
+    ├── conges.py             ← demandes de congé + approbation
+    ├── contrats.py            ← contrats
+    ├── dossiers.py             ← dossiers administratifs + upload fichier
+    ├── evaluations.py          ← évaluations de performance
+    ├── projets.py                ← projets
+    ├── taches.py                  ← tâches liées à un projet
+    ├── dashboard.py                ← statistiques
+    └── chatbot.py                  ← assistant RH (RAG + Groq)
+```
+
+Collections MongoDB : `users`, `conges`, `contrats`, `dossiers`, `evaluations`, `projets`, `taches`.

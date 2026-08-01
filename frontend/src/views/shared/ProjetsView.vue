@@ -8,7 +8,7 @@
       <div class="flex gap-3">
         <button :class="vue === 'liste' ? 'btn-primary' : 'btn-ghost'" @click="vue='liste'"><i class="fa-solid fa-table-list"></i> Liste</button>
         <button :class="vue === 'kanban' ? 'btn-primary' : 'btn-ghost'" @click="vue='kanban'"><i class="fa-solid fa-columns"></i> Colonnes</button>
-        <button class="btn-primary" v-if="auth.isManager" @click="openAdd"><i class="fa-solid fa-plus"></i> Nouveau projet</button>
+        <button class="btn-primary" v-if="auth.isAdmin" @click="openAdd"><i class="fa-solid fa-plus"></i> Nouveau projet</button>
       </div>
     </div>
 
@@ -52,8 +52,8 @@
               <td>
                 <div class="flex gap-2">
                   <button class="btn-ghost" style="padding:6px 12px;font-size:12px" @click="openTaches(p)"><i class="fa-solid fa-list-check"></i> Tâches</button>
-                  <button v-if="auth.isManager" class="btn-edit" style="justify-content:center" @click="openEdit(p)"><i class="fa-solid fa-pen"></i></button>
-                  <button v-if="auth.isManager" class="btn-danger" style="justify-content:center" @click="supprimer(p)"><i class="fa-solid fa-trash"></i></button>
+                  <button v-if="auth.isAdmin" class="btn-edit" style="justify-content:center" @click="openEdit(p)"><i class="fa-solid fa-pen"></i></button>
+                  <button v-if="auth.isAdmin" class="btn-danger" style="justify-content:center" @click="supprimer(p)"><i class="fa-solid fa-trash"></i></button>
                 </div>
               </td>
             </tr>
@@ -97,13 +97,13 @@
           <button class="btn-ghost" style="flex:1;justify-content:center" @click="openTaches(p)">
             <i class="fa-solid fa-list-check"></i> Tâches
           </button>
-          <button v-if="auth.isManager" class="btn-edit" style="justify-content:center" @click="openEdit(p)"><i class="fa-solid fa-pen"></i></button>
-          <button v-if="auth.isManager" class="btn-danger" style="justify-content:center" @click="supprimer(p)"><i class="fa-solid fa-trash"></i></button>
+          <button v-if="auth.isAdmin" class="btn-edit" style="justify-content:center" @click="openEdit(p)"><i class="fa-solid fa-pen"></i></button>
+          <button v-if="auth.isAdmin" class="btn-danger" style="justify-content:center" @click="supprimer(p)"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>
 
       <!-- Add card (manager only) -->
-      <div v-if="auth.isManager" class="card flex items-center justify-center"
+      <div v-if="auth.isAdmin" class="card flex items-center justify-center"
         style="border-style:dashed;min-height:180px;cursor:pointer" @click="openAdd">
         <div class="text-center">
           <div style="width:48px;height:48px;border-radius:50%;border:2px dashed rgba(59,130,246,0.3);background:rgba(59,130,246,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
@@ -229,12 +229,13 @@
 </template>
 
 <script setup>
-import { ref, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
 import ModalBase from '@/components/shared/ModalBase.vue'
 import { useAuthStore } from '@/stores/auth.js'
 import projetService from '@/services/projetService.js'
 import tacheService from '@/services/tacheService.js'
 import employeService from '@/services/employeService.js'
+import stagiaireService from '@/services/stagiaireService.js'
 
 const auth  = useAuthStore()
 const toast = inject('toast')
@@ -261,10 +262,16 @@ async function openTaches(p) {
   showFormTache.value   = false
   taches.value = []
   try { taches.value = await tacheService.getAll(p.id) } catch (_) {}
+  const assignables = []
   try {
     const emp = await employeService.getAll()
-    employesList.value = emp.map(e => ({ id: e.id, name: `${e.prenom} ${e.nom}`, poste: e.poste || '' }))
+    assignables.push(...emp)
   } catch (_) {}
+  try {
+    const stag = await stagiaireService.getAll()
+    assignables.push(...stag)
+  } catch (_) {}
+  employesList.value = assignables.map(e => ({ id: e.id, name: `${e.prenom} ${e.nom}`, poste: e.poste || '' }))
 }
 function openAddTache() {
   formTache.value = { id: null, titre: '', description: '', statut: 'À faire', priorite: 'Normale', assigneAId: null }
@@ -290,6 +297,7 @@ async function saveTache() {
       toast.success('Ajouté', 'Tâche créée et assignée.')
     }
     showFormTache.value = false
+    loadAllTaches()
   } catch (_) {
     toast.error('Erreur serveur', 'Vérifiez que le backend est lancé.')
   }
@@ -300,23 +308,33 @@ async function supprimerTache(t) {
     await tacheService.delete(projetActif.value.id, t.id)
     taches.value = taches.value.filter(x => x.id !== t.id)
     toast.success('Supprimé', 'Tâche supprimée.')
+    loadAllTaches()
   } catch (_) {
     toast.error('Erreur serveur', 'Impossible de supprimer.')
   }
 }
 
-const projets = ref([
-  {id:1,nom:'ERP v3.0',couleur:'#3b82f6',gradient:'linear-gradient(90deg,#3b82f6,#06b6d4)',categorie:'Développement',statut:'En cours',description:'Refonte complète du système ERP interne.',avancement:68,deadline:'30 Avr',membres:[{initials:'KB',color:'linear-gradient(135deg,#3b82f6,#06b6d4)'},{initials:'LB',color:'linear-gradient(135deg,#ef4444,#f87171)'},{initials:'YA',color:'linear-gradient(135deg,#8b5cf6,#a78bfa)'}]},
-  {id:2,nom:'App Mobile RH',couleur:'#f59e0b',gradient:'linear-gradient(90deg,#f59e0b,#fbbf24)',categorie:'Mobile / Design',statut:'En pause',description:'Application mobile pour la gestion des congés.',avancement:34,deadline:'15 Jun',membres:[{initials:'SM',color:'linear-gradient(135deg,#10b981,#34d399)'},{initials:'YA',color:'linear-gradient(135deg,#8b5cf6,#a78bfa)'}]},
-  {id:3,nom:'Dashboard Analytics',couleur:'#10b981',gradient:'linear-gradient(90deg,#10b981,#34d399)',categorie:'Data / Dev',statut:'Terminé',description:'Tableau de bord pour le suivi des KPIs RH.',avancement:100,deadline:'Livré',membres:[{initials:'KB',color:'linear-gradient(135deg,#3b82f6,#06b6d4)'},{initials:'MK',color:'linear-gradient(135deg,#f59e0b,#fbbf24)'}]},
-])
+const projets = ref([])
 
-const kanban = [
-  {title:'À faire',    badgeClass:'badge-slate', cards:[{title:'Design API Gateway',sub:'Architecture backend',badge:'Haute priorité',badgeClass:'badge-red'},{title:'Tests unitaires module RH',sub:'QA / Tests'},{title:'Documentation technique',sub:'Rédaction'}]},
-  {title:'En cours',   badgeClass:'badge-blue',  cards:[{title:'Développement UI Employés',sub:'Frontend · Karima B.',progress:70},{title:'Intégration SMTP email',sub:'Backend · Lina B.',progress:45}]},
-  {title:'En révision',badgeClass:'badge-amber', cards:[{title:'Module authentification JWT',sub:'Security · Review',badge:'En revue',badgeClass:'badge-amber'}]},
-  {title:'Terminé',    badgeClass:'badge-green',  cards:[{title:'Setup base de données',sub:'PostgreSQL + Redis'},{title:'Maquettes Figma',sub:'Design · Sana M.'}]},
+const allTaches = ref([])
+async function loadAllTaches() {
+  const lists = await Promise.all(
+    projets.value.map(p => tacheService.getAll(p.id).catch(() => []))
+  )
+  allTaches.value = lists.flatMap((ts, i) => ts.map(t => ({ ...t, projetNom: projets.value[i].nom })))
+}
+
+const KANBAN_COLUMNS = [
+  { title: 'À faire',  badgeClass: 'badge-slate', statut: 'À faire' },
+  { title: 'En cours', badgeClass: 'badge-blue',  statut: 'En cours' },
+  { title: 'Terminé',  badgeClass: 'badge-green', statut: 'Terminé' },
 ]
+const kanban = computed(() => KANBAN_COLUMNS.map(col => ({
+  ...col,
+  cards: allTaches.value
+    .filter(t => t.statut === col.statut)
+    .map(t => ({ title: t.titre, sub: t.projetNom + (t.assigneA ? ' · ' + t.assigneA.nom : '') })),
+})))
 
 const statutBadge = (s) => ({ 'En cours':'badge-blue','En pause':'badge-amber','Terminé':'badge-green' }[s] || 'badge-slate')
 
@@ -346,11 +364,12 @@ async function saveProjet() {
     toast.success('Succès', 'Projet enregistré en base de données.')
     showModal.value = false
   } catch (_) {
-    toast.error('Erreur serveur', 'Vérifiez que le backend est lancé (php -S localhost:8000 -t public).')
+    toast.error('Erreur serveur', 'Vérifiez que le backend est lancé (python run.py).')
   }
 }
 
 onMounted(async () => {
-  try { const d = await projetService.getAll(); if (d?.length) projets.value = d } catch (_) {}
+  try { const d = await projetService.getAll(); if (d) projets.value = d } catch (_) {}
+  try { await loadAllTaches() } catch (_) {}
 })
 </script>

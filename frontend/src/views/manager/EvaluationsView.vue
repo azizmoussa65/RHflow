@@ -89,14 +89,7 @@ const showModal = ref(false)
 const editMode  = ref(false)
 const form = ref({ id: null, employeId: null, employeName: '', periode: '', competences: 4, teamwork: 4, initiative: 4, commentaire: '' })
 
-const DEMO_EMPLOYES = [
-  { id: 3, name: 'Karima Belhadj' },
-  { id: 4, name: 'Yassine Aouat' },
-  { id: 5, name: 'Sana Mrad' },
-  { id: 6, name: 'Mehdi Khelifi' },
-  { id: 7, name: 'Lina Bouzid' },
-]
-const employesList = ref(DEMO_EMPLOYES)
+const employesList = ref([])
 
 const AVATAR_COLORS = [
   'linear-gradient(135deg,#3b82f6,#06b6d4)',
@@ -130,26 +123,7 @@ function buildCriteres(ev) {
   ]
 }
 
-const evaluations = ref([
-  {id:1,nom:'Karima Belhadj',initials:'KB',color:'linear-gradient(135deg,#3b82f6,#06b6d4)',poste:'Dev Frontend',periode:'Jan 2025',noteGlobale:4.5,scoreColor:'#3b82f6',criteres:[
-    {label:'Compétences techniques',score:4.8,color:'linear-gradient(90deg,#3b82f6,#06b6d4)'},
-    {label:'Travail en équipe',     score:4.5,color:'linear-gradient(90deg,#10b981,#34d399)'},
-    {label:'Ponctualité',           score:4.2,color:'linear-gradient(90deg,#8b5cf6,#a78bfa)'},
-    {label:'Initiative',            score:4.4,color:'linear-gradient(90deg,#f59e0b,#fbbf24)'},
-  ]},
-  {id:2,nom:'Yassine Aouat',initials:'YA',color:'linear-gradient(135deg,#8b5cf6,#a78bfa)',poste:'Chef de projet',periode:'Déc 2024',noteGlobale:3.8,scoreColor:'#8b5cf6',criteres:[
-    {label:'Compétences techniques',score:3.5,color:'linear-gradient(90deg,#3b82f6,#06b6d4)'},
-    {label:'Leadership',            score:4.2,color:'linear-gradient(90deg,#10b981,#34d399)'},
-    {label:'Communication',         score:4.0,color:'linear-gradient(90deg,#8b5cf6,#a78bfa)'},
-    {label:'Gestion du temps',      score:3.5,color:'linear-gradient(90deg,#f59e0b,#fbbf24)'},
-  ]},
-  {id:3,nom:'Sana Mrad',initials:'SM',color:'linear-gradient(135deg,#10b981,#34d399)',poste:'UI/UX Designer',periode:'Fév 2025',noteGlobale:4.7,scoreColor:'#10b981',criteres:[
-    {label:'Créativité',   score:5.0,color:'linear-gradient(90deg,#3b82f6,#06b6d4)'},
-    {label:'UX Research',  score:4.8,color:'linear-gradient(90deg,#10b981,#34d399)'},
-    {label:'Collaboration',score:4.5,color:'linear-gradient(90deg,#8b5cf6,#a78bfa)'},
-    {label:'Délais',       score:4.3,color:'linear-gradient(90deg,#f59e0b,#fbbf24)'},
-  ]},
-])
+const evaluations = ref([])
 
 function onEmployeChange() {
   const emp = employesList.value.find(e => e.id === form.value.employeId)
@@ -220,14 +194,14 @@ async function saveEval() {
 onMounted(async () => {
   try {
     const emp = await employeService.getAll()
-    if (emp?.length) {
+    if (emp) {
       employesList.value = emp.map(e => ({ id: e.id, name: `${e.prenom} ${e.nom}` }))
     }
   } catch (_) {}
 
   try {
     const d = await evaluationService.getAll()
-    if (d?.length) {
+    if (d) {
       evaluations.value = d.map(ev => ({
         ...ev,
         nom: ev.employe ?? '',

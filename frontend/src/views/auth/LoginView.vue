@@ -8,7 +8,7 @@
 
       <!-- Contenu par-dessus la photo -->
       <div class="panel-content">
-        <div class="brand-logo">HR</div>
+        <div class="brand-logo"><img src="/logo-icon.png" alt="HRFlow" style="width:70%;height:70%;object-fit:contain" /></div>
         <h2 class="brand-title">HRFlow</h2>
         <p class="brand-sub">Système de Gestion des Ressources Humaines</p>
 
@@ -23,7 +23,7 @@
     <div class="right-panel">
       <div class="login-box">
         <div class="text-center mb-6">
-          <div class="logo-mark mx-auto mb-4" style="width:52px;height:52px;font-size:18px">HR</div>
+          <div class="logo-mark mx-auto mb-4" style="width:52px;height:52px"><img src="/logo-icon.png" alt="HRFlow" /></div>
           <h1 style="font-size:1.5rem;font-weight:700;color:var(--text-primary)">Bienvenue sur HRFlow</h1>
           <p style="font-size:13px;color:var(--text-muted);margin-top:6px">Connectez-vous pour accéder à votre espace</p>
         </div>
@@ -107,7 +107,7 @@ async function handleLogin() {
   loading.value = false
 
   if (result.success) {
-    const redirectMap = { MANAGER: '/dashboard', RH: '/employes', EMPLOYE: '/profil' }
+    const redirectMap = { ADMIN: '/dashboard', RH: '/employes', EMPLOYE: '/profil', STAGIAIRE: '/projets' }
     router.push(redirectMap[auth.role] || '/dashboard')
   } else {
     error.value = result.message

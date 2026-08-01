@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth.js'
 /**
  * Route definitions with role-based meta guards.
  * meta.requiresAuth: true → user must be logged in
- * meta.roles: ['MANAGER','RH','EMPLOYE'] → allowed roles (empty = all authenticated)
+ * meta.roles: ['ADMIN','RH','EMPLOYE'] → allowed roles (empty = all authenticated)
  */
 const routes = [
   // Public
@@ -16,7 +16,9 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/dashboard'
+    name: 'Landing',
+    component: () => import('@/views/LandingView.vue'),
+    meta: { requiresAuth: false }
   },
 
   // Authenticated layout
@@ -25,50 +27,68 @@ const routes = [
     component: () => import('@/components/layout/AppLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      // MANAGER routes
+      // ADMIN routes
       {
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/manager/DashboardView.vue'),
-        meta: { requiresAuth: true, roles: ['MANAGER', 'RH'] }
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH'] }
       },
       {
         path: 'employes',
         name: 'Employes',
         component: () => import('@/views/shared/EmployesView.vue'),
-        meta: { requiresAuth: true, roles: ['MANAGER', 'RH'] }
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH'] }
       },
       {
         path: 'evaluations',
         name: 'Evaluations',
         component: () => import('@/views/manager/EvaluationsView.vue'),
-        meta: { requiresAuth: true, roles: ['MANAGER'] }
+        meta: { requiresAuth: true, roles: ['ADMIN'] }
+      },
+      {
+        path: 'stagiaires',
+        name: 'Stagiaires',
+        component: () => import('@/views/rh/StagiairesView.vue'),
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH'] }
+      },
+      {
+        path: 'recrutement',
+        name: 'Recrutement',
+        component: () => import('@/views/rh/RecrutementView.vue'),
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH'] }
+      },
+      {
+        path: 'demandes-demo',
+        name: 'DemandesDemo',
+        component: () => import('@/views/rh/DemandesDemoView.vue'),
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH'] }
       },
       // RH routes
       {
         path: 'contrats',
         name: 'Contrats',
         component: () => import('@/views/rh/ContratsView.vue'),
-        meta: { requiresAuth: true, roles: ['MANAGER', 'RH'] }
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH'] }
       },
       {
         path: 'dossiers',
         name: 'Dossiers',
         component: () => import('@/views/rh/DossiersView.vue'),
-        meta: { requiresAuth: true, roles: ['MANAGER', 'RH'] }
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH'] }
       },
       {
         path: 'conges',
         name: 'Conges',
         component: () => import('@/views/rh/CongesView.vue'),
-        meta: { requiresAuth: true, roles: ['MANAGER', 'RH'] }
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH'] }
       },
       // Shared project view (different UI per role)
       {
         path: 'projets',
         name: 'Projets',
         component: () => import('@/views/shared/ProjetsView.vue'),
-        meta: { requiresAuth: true, roles: ['MANAGER', 'RH', 'EMPLOYE'] }
+        meta: { requiresAuth: true, roles: ['ADMIN', 'RH', 'EMPLOYE', 'STAGIAIRE'] }
       },
       // Employé routes
       {
@@ -96,6 +116,12 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
+        path: 'messages',
+        name: 'Messages',
+        component: () => import('@/views/shared/MessagesView.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
         path: 'calendrier',
         name: 'Calendrier',
         component: () => import('@/views/shared/CalendrierView.vue'),
@@ -105,7 +131,7 @@ const routes = [
         path: 'dashboard-rh',
         name: 'DashboardRH',
         component: () => import('@/views/rh/DashboardRHView.vue'),
-        meta: { requiresAuth: true, roles: ['RH', 'MANAGER'] }
+        meta: { requiresAuth: true, roles: ['RH', 'ADMIN'] }
       }
     ]
   },
@@ -133,7 +159,7 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return next('/login')
   }
-  if (to.path === '/login' && auth.isAuthenticated) {
+  if ((to.path === '/login' || to.path === '/') && auth.isAuthenticated) {
     return next(getDefaultRouteForRole(auth.role))
   }
   if (to.meta.roles && to.meta.roles.length > 0 && auth.isAuthenticated) {
@@ -147,9 +173,10 @@ router.beforeEach((to, from, next) => {
 /** Returns the default page after login based on role */
 function getDefaultRouteForRole(role) {
   switch (role) {
-    case 'MANAGER': return '/dashboard'
+    case 'ADMIN': return '/dashboard'
     case 'RH':      return '/employes'
     case 'EMPLOYE': return '/profil'
+    case 'STAGIAIRE': return '/projets'
     default:        return '/dashboard'
   }
 }

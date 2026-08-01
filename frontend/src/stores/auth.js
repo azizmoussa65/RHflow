@@ -10,9 +10,10 @@ export const useAuthStore = defineStore('auth', () => {
   // Getters
   const isAuthenticated = computed(() => !!token.value)
   const role = computed(() => user.value?.role || null)
-  const isManager = computed(() => role.value === 'MANAGER')
+  const isAdmin = computed(() => role.value === 'ADMIN')
   const isRH = computed(() => role.value === 'RH')
   const isEmploye = computed(() => role.value === 'EMPLOYE')
+  const isStagiaire = computed(() => role.value === 'STAGIAIRE')
   const userInitials = computed(() => {
     if (!user.value) return 'U'
     return `${(user.value.prenom || '')[0] || ''}${(user.value.nom || '')[0] || ''}`.toUpperCase()
@@ -24,20 +25,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   // ── Demo accounts (used as fallback when backend is offline) ──────────────
   const DEMO_USERS = {
-    'manager@hrflow.tn': {
-      id: 1, email: 'manager@hrflow.tn', prenom: 'Ahmed', nom: 'Mansouri',
-      role: 'MANAGER', departement: 'Direction Générale', poste: 'Manager Général',
-      initials: 'AM', statut: 'Actif'
+    'admin@satisfyinsight.cm': {
+      id: 1, email: 'admin@satisfyinsight.cm', prenom: 'Admin', nom: 'Satisfy',
+      role: 'ADMIN', departement: 'Direction Générale', poste: 'Administrateur',
+      initials: 'AS', statut: 'Actif'
     },
-    'rh@hrflow.tn': {
-      id: 2, email: 'rh@hrflow.tn', prenom: 'Omar', nom: 'Trabelsi',
+    'rh@satisfyinsight.com': {
+      id: 2, email: 'rh@satisfyinsight.com', prenom: 'RH', nom: 'Satisfy',
       role: 'RH', departement: 'Ressources Humaines', poste: 'Responsable RH',
-      initials: 'OT', statut: 'Actif'
-    },
-    'employe@hrflow.tn': {
-      id: 3, email: 'employe@hrflow.tn', prenom: 'Employé', nom: 'Demo',
-      role: 'EMPLOYE', departement: 'Développement', poste: 'Agent RH',
-      initials: 'ED', statut: 'Actif'
+      initials: 'RS', statut: 'Actif'
     },
   }
 
@@ -60,7 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Mode démo (backend hors ligne)
     const demoUser = DEMO_USERS[email.toLowerCase()]
-    if (demoUser && password === 'password') {
+    if (demoUser && password === 'password123') {
       const fakeToken = 'demo_token_' + demoUser.role
       token.value = fakeToken
       user.value  = demoUser
@@ -69,7 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: true }
     }
 
-    return { success: false, message: 'Impossible de joindre le serveur. Vérifiez que le backend est lancé (php -S localhost:8000 -t public).' }
+    return { success: false, message: 'Impossible de joindre le serveur. Vérifiez que le backend est lancé (python run.py).' }
   }
 
   function logout() {
@@ -81,7 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     token, user,
-    isAuthenticated, role, isManager, isRH, isEmploye,
+    isAuthenticated, role, isAdmin, isRH, isEmploye, isStagiaire,
     userInitials, userFullName,
     login, logout
   }

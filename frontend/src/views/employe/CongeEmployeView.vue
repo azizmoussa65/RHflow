@@ -11,15 +11,15 @@
     <!-- Solde congés -->
     <div class="grid grid-cols-3 gap-4 mb-6">
       <div class="card-sm text-center">
-        <div style="font-size:1.8rem;font-weight:700;color:#3b82f6">18</div>
+        <div style="font-size:1.8rem;font-weight:700;color:#3b82f6">{{ soldeRestant }}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Jours restants</div>
       </div>
       <div class="card-sm text-center">
-        <div style="font-size:1.8rem;font-weight:700;color:#10b981">12</div>
+        <div style="font-size:1.8rem;font-weight:700;color:#10b981">{{ joursPris }}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Jours pris</div>
       </div>
       <div class="card-sm text-center">
-        <div style="font-size:1.8rem;font-weight:700;color:#f59e0b">30</div>
+        <div style="font-size:1.8rem;font-weight:700;color:#f59e0b">{{ TOTAL_ANNUEL }}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Total annuel</div>
       </div>
     </div>
@@ -89,8 +89,11 @@ import { ref, inject, onMounted, computed } from 'vue'
 import ModalBase from '@/components/shared/ModalBase.vue'
 import DatePickerFerie from '@/components/shared/DatePickerFerie.vue'
 import congeService from '@/services/congeService.js'
+import { useAuthStore } from '@/stores/auth.js'
 
+const auth  = useAuthStore()
 const toast = inject('toast')
+const TOTAL_ANNUEL = 30
 const showModal = ref(false)
 const form = ref({ type:'Congé annuel', dateDebut:'', dateFin:'', motif:'' })
 
@@ -137,6 +140,9 @@ const mesConges = ref([
   { id:2, type:'Maladie',      dateDebut:'05/03/2025', dateFin:'07/03/2025', nbJours:3, motif:'Ordonnance médicale', statut:'APPROUVE' },
 ])
 
+const joursPris    = computed(() => mesConges.value.filter(c => c.statut === 'APPROUVE').reduce((s, c) => s + (c.nbJours || 0), 0))
+const soldeRestant = computed(() => Math.max(0, TOTAL_ANNUEL - joursPris.value))
+
 const typeIcon     = (t) => ({ 'Congé annuel':'fa-solid fa-umbrella-beach', Maladie:'fa-solid fa-hospital', 'Maternité/Paternité':'fa-solid fa-baby', Exceptionnel:'fa-solid fa-star' }[t] || 'fa-solid fa-calendar')
 const statutBadge  = (s) => ({ EN_ATTENTE:'badge-amber', APPROUVE:'badge-green', REFUSE:'badge-red' }[s] || 'badge-slate')
 const statutLabel  = (s) => ({ EN_ATTENTE:'En attente', APPROUVE:'Approuvé', REFUSE:'Refusé' }[s] || s)
@@ -154,6 +160,9 @@ async function submit() {
 }
 
 onMounted(async () => {
-  try { const d = await congeService.getAll(); if (d?.length) mesConges.value = d } catch (_) {}
+  try {
+    const d = await congeService.getAll({ employeId: auth.user?.id })
+    if (d) mesConges.value = d
+  } catch (_) {}
 })
 </script>

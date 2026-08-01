@@ -61,13 +61,13 @@
                 <td>{{ c.motif }}</td>
                 <td><span class="badge" :class="statutBadge(c.statut)">{{ statutLabel(c.statut) }}</span></td>
                 <td>
-                  <!-- RH can approve employee leaves but not their own; Manager can approve all -->
-                  <div class="flex gap-2" v-if="c.statut === 'EN_ATTENTE' && (auth.isManager || !c.isRH)">
+                  <!-- RH can approve employee leaves but not their own; Admin can approve all -->
+                  <div class="flex gap-2" v-if="c.statut === 'EN_ATTENTE' && (auth.isAdmin || !c.isRH)">
                     <button class="btn-edit" style="padding:5px 10px;font-size:11px" @click="approuver(c)"><i class="fa-solid fa-check"></i> Approuver</button>
                     <button class="btn-danger" style="padding:5px 10px;font-size:11px" @click="refuser(c)"><i class="fa-solid fa-xmark"></i> Refuser</button>
                   </div>
                   <span v-else-if="c.statut === 'EN_ATTENTE' && c.isRH" style="font-size:11px;color:var(--text-muted)">
-                    <i class="fa-solid fa-clock" style="margin-right:4px"></i>Attente manager
+                    <i class="fa-solid fa-clock" style="margin-right:4px"></i>Attente admin
                   </span>
                 </td>
               </tr>
@@ -187,7 +187,7 @@
     <ModalBase v-model="showModalPerso" title="Demander un congé personnel">
       <div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#8b5cf6">
         <i class="fa-solid fa-info-circle" style="margin-right:6px"></i>
-        Cette demande sera soumise au <strong>Manager</strong> pour approbation.
+        Cette demande sera soumise à l'<strong>Administrateur</strong> pour approbation.
       </div>
       <div class="form-group"><label class="form-label">Type de congé</label>
         <select class="form-select" v-model="formPerso.type">
@@ -213,7 +213,7 @@
         <textarea class="form-input" rows="2" v-model="formPerso.motif" placeholder="Précisez le motif..."></textarea></div>
       <div class="flex gap-3 mt-4">
         <button class="btn-primary flex-1" style="justify-content:center" @click="soumettreDemande">
-          <i class="fa-solid fa-paper-plane"></i> Soumettre au Manager
+          <i class="fa-solid fa-paper-plane"></i> Soumettre à l'Administrateur
         </button>
         <button class="btn-ghost" @click="showModalPerso=false">Annuler</button>
       </div>
@@ -274,14 +274,7 @@ const feriesPerso = ref([])
 const formPerso = ref({ type: 'Annuel', dateDebut: '', dateFin: '', motif: '' })
 function checkFeriesPerso() { feriesPerso.value = feriesInRange(formPerso.value.dateDebut, formPerso.value.dateFin) }
 
-const DEMO_EMPLOYES = [
-  { id: 3, name: 'Karima Belhadj' },
-  { id: 4, name: 'Yassine Aouat' },
-  { id: 5, name: 'Sana Mrad' },
-  { id: 6, name: 'Mehdi Khelifi' },
-  { id: 7, name: 'Lina Bouzid' },
-]
-const employesList = ref(DEMO_EMPLOYES)
+const employesList = ref([])
 
 const AVATAR_COLORS = [
   'linear-gradient(135deg,#3b82f6,#06b6d4)',
@@ -296,15 +289,10 @@ function empColor(initials) {
   return AVATAR_COLORS[idx]
 }
 
-const conges = ref([
-  {id:1,employe:'Yassine Aouat', initials:'YA',type:'Annuel',     dateDebut:'15/03/2025',dateFin:'20/03/2025',nbJours:5, motif:'Vacances',statut:'EN_ATTENTE',isRH:false},
-  {id:2,employe:'Karima Belhadj',initials:'KB',type:'Maladie',    dateDebut:'22/03/2025',dateFin:'24/03/2025',nbJours:3, motif:'Médical', statut:'EN_ATTENTE',isRH:false},
-  {id:3,employe:'Sana Mrad',     initials:'SM',type:'Annuel',     dateDebut:'01/04/2025',dateFin:'11/04/2025',nbJours:10,motif:'Voyage',  statut:'APPROUVE',  isRH:false},
-  {id:4,employe:'Mehdi Khelifi', initials:'MK',type:'Exceptionnel',dateDebut:'10/03/2025',dateFin:'12/03/2025',nbJours:3,motif:'Mariage', statut:'REFUSE',    isRH:false},
-])
+const conges = ref([])
 
-// Congés personnels du RH
-const mesCongesPerso = computed(() => conges.value.filter(c => c.isRH))
+// Congés personnels du RH (les siens, identifiés par employeId, avec fallback sur le flag de démo isRH)
+const mesCongesPerso = computed(() => conges.value.filter(c => c.isRH || (auth.user?.id && c.employeId === auth.user.id)))
 const joursPris      = computed(() => mesCongesPerso.value.filter(c => c.statut === 'APPROUVE').reduce((s,c) => s + (c.nbJours||0), 0))
 const soldeRestant   = computed(() => Math.max(0, 30 - joursPris.value))
 
@@ -387,7 +375,7 @@ async function soumettreDemande() {
     const payload = { type: formPerso.value.type, dateDebut: formPerso.value.dateDebut, dateFin: formPerso.value.dateFin, motif: formPerso.value.motif }
     const created = await congeService.create(payload)
     conges.value.unshift({ ...created, isRH: true })
-    toast.success('Demande envoyée', 'Votre demande a été soumise au Manager et enregistrée en base.')
+    toast.success('Demande envoyée', "Votre demande a été soumise à l'administrateur et enregistrée en base.")
     showModalPerso.value = false
     formPerso.value = { type: 'Annuel', dateDebut: '', dateFin: '', motif: '' }
     feriesPerso.value = []
@@ -399,11 +387,11 @@ async function soumettreDemande() {
 onMounted(async () => {
   try {
     const data = await employeService.getAll()
-    if (data?.length) employesList.value = data.map(e => ({ id: e.id, name: `${e.prenom} ${e.nom}` }))
+    if (data) employesList.value = data.map(e => ({ id: e.id, name: `${e.prenom} ${e.nom}` }))
   } catch (_) {}
   try {
     const d = await congeService.getAll()
-    if (d?.length) conges.value = d
+    if (d) conges.value = d
   } catch (_) {}
 })
 </script>

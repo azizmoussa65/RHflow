@@ -8,8 +8,9 @@
       <!-- Avatar card -->
       <div class="card text-center">
         <div class="avatar-lg mx-auto mb-3"
-          style="width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,#3b82f6,#06b6d4);font-size:22px">
-          {{ auth.userInitials }}
+          style="width:72px;height:72px;border-radius:18px;background:linear-gradient(135deg,#3b82f6,#06b6d4);font-size:22px;overflow:hidden">
+          <img v-if="photoUrl" :src="photoUrl" style="width:100%;height:100%;object-fit:cover" />
+          <template v-else>{{ auth.userInitials }}</template>
         </div>
         <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">{{ auth.userFullName }}</div>
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">{{ roleLabel }}</div>
@@ -18,8 +19,11 @@
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Membre depuis</div>
           <div style="font-size:13px;font-weight:500;color:var(--text-primary)">{{ auth.user?.dateEmbauche || 'Janvier 2022' }}</div>
         </div>
-        <button class="btn-ghost w-full mt-4" style="justify-content:center">
-          <i class="fa-solid fa-camera"></i> Changer photo
+        <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onPhotoSelected" />
+        <button class="btn-ghost w-full mt-4" style="justify-content:center" @click="$refs.fileInput.click()" :disabled="uploadingPhoto">
+          <i v-if="uploadingPhoto" class="fa-solid fa-spinner fa-spin"></i>
+          <i v-else class="fa-solid fa-camera"></i>
+          {{ uploadingPhoto ? 'Envoi...' : 'Changer photo' }}
         </button>
       </div>
 
@@ -70,13 +74,34 @@
 import { ref, computed, inject } from 'vue'
 import { useAuthStore } from '@/stores/auth.js'
 import api from '@/services/api.js'
+import authService from '@/services/authService.js'
+import { avatarUrl } from '@/utils/avatar.js'
 
 const auth  = useAuthStore()
 const toast = inject('toast')
 const saving = ref(false)
 const pwdError = ref('')
+const uploadingPhoto = ref(false)
 
-const roleLabel = computed(() => ({ MANAGER: 'Manager Général', RH: 'Responsable RH', EMPLOYE: 'Employé' }[auth.role] || ''))
+const photoUrl = computed(() => avatarUrl(auth.user))
+
+async function onPhotoSelected(e) {
+  const file = e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  uploadingPhoto.value = true
+  try {
+    const updatedUser = await authService.uploadAvatar(file)
+    auth.user = { ...auth.user, ...updatedUser }
+    localStorage.setItem('hrflow_user', JSON.stringify(auth.user))
+    toast.success('Photo mise à jour', 'Votre photo de profil a été enregistrée.')
+  } catch (_) {
+    toast.error('Erreur', "Impossible d'envoyer la photo.")
+  }
+  uploadingPhoto.value = false
+}
+
+const roleLabel = computed(() => ({ ADMIN: 'Administrateur', RH: 'Responsable RH', EMPLOYE: 'Employé', STAGIAIRE: 'Stagiaire' }[auth.role] || ''))
 
 const initial = () => ({
   prenom:       auth.user?.prenom      || '',

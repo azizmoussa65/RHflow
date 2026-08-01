@@ -14,24 +14,26 @@ echo  Demarrage de l'application HRFlow...
 echo  =====================================
 echo.
 
-REM Demarrer le backend PHP
+REM MongoDB tourne en service Windows natif (demarrage automatique), rien a lancer ici.
+
+REM Demarrer le backend Python/Flask
 echo  [1/2] Demarrage du Backend (port 8000)...
-start "HRFlow Backend" cmd /k "cd /d C:\Users\STE GIMS\Desktop\PFE\backend && color 0B && echo Backend HRFlow demarre sur http://localhost:8000 && echo. && php -S localhost:8000 -t public"
+start "HRFlow Backend" cmd /k "cd /d "%~dp0backend" && color 0B && echo Backend HRFlow demarre sur http://localhost:8000 && echo. && .venv\Scripts\python run.py"
 
 REM Attendre 2 secondes que le backend soit pret
 timeout /t 2 /nobreak > nul
 
 REM Demarrer le frontend Vue.js
 echo  [2/2] Demarrage du Frontend (port 5173)...
-start "HRFlow Frontend" cmd /k "cd /d C:\Users\STE GIMS\Desktop\PFE\frontend && color 0D && echo Frontend HRFlow demarre sur http://localhost:5173 && echo. && npm run dev"
+start "HRFlow Frontend" cmd /k "cd /d "%~dp0frontend" && color 0D && echo Frontend HRFlow demarre sur http://localhost:5173 && echo. && npm run dev"
 
-REM Attendre 4 secondes que le frontend compile
+REM Attendre que le frontend compile
 echo.
 echo  Chargement en cours... (attente 5 secondes)
 timeout /t 5 /nobreak > nul
 
 REM Ouvrir le navigateur
-echo  [3/3] Ouverture du navigateur...
+echo  Ouverture du navigateur...
 start http://localhost:5173
 
 echo.

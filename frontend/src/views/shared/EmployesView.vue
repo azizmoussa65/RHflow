@@ -167,14 +167,7 @@ function empColor(id) {
 const defaultForm = () => ({ id: null, prenom: '', nom: '', email: '', telephone: '', departement: 'Développement', poste: '', dateEmbauche: '', password: 'password' })
 const form = ref(defaultForm())
 
-const employes = ref([
-  {id:1,prenom:'Karima', nom:'Belhadj',initials:'KB',color:'linear-gradient(135deg,#3b82f6,#06b6d4)',email:'k.belhadj@hrflow.tn',departement:'Développement',poste:'Développeuse Frontend',dateEmbauche:'Jan 2024',statut:'Actif'},
-  {id:2,prenom:'Yassine',nom:'Aouat',  initials:'YA',color:'linear-gradient(135deg,#8b5cf6,#a78bfa)',email:'y.aouat@hrflow.tn',  departement:'Marketing',    poste:'Chef de projet digital',dateEmbauche:'Mar 2023',statut:'En congé'},
-  {id:3,prenom:'Sana',   nom:'Mrad',   initials:'SM',color:'linear-gradient(135deg,#10b981,#34d399)',email:'s.mrad@hrflow.tn',   departement:'Design',       poste:'UI/UX Designer',       dateEmbauche:'Jun 2024',statut:'Actif'},
-  {id:4,prenom:'Mehdi',  nom:'Khelifi',initials:'MK',color:'linear-gradient(135deg,#f59e0b,#fbbf24)',email:'m.khelifi@hrflow.tn',departement:'Finance',      poste:'Comptable Senior',     dateEmbauche:'Sep 2021',statut:'Actif'},
-  {id:5,prenom:'Lina',   nom:'Bouzid', initials:'LB',color:'linear-gradient(135deg,#ef4444,#f87171)',email:'l.bouzid@hrflow.tn', departement:'Développement',poste:'Développeuse Backend', dateEmbauche:'Fév 2025',statut:'Actif'},
-  {id:6,prenom:'Omar',   nom:'Trabelsi',initials:'OT',color:'linear-gradient(135deg,#06b6d4,#67e8f9)',email:'o.trabelsi@hrflow.tn',departement:'RH',         poste:'Responsable RH',       dateEmbauche:'Mai 2020',statut:'Actif'},
-])
+const employes = ref([])
 
 const filtered = computed(() => employes.value.filter(e => {
   const q = search.value.toLowerCase()
@@ -223,7 +216,7 @@ async function saveEmploye() {
     }
     showModal.value = false
   } catch (_) {
-    toast.error('Erreur serveur', 'Vérifiez que le backend est lancé (php -S localhost:8000 -t public).')
+    toast.error('Erreur serveur', 'Vérifiez que le backend est lancé (python run.py).')
   }
   saving.value = false
 }
@@ -232,7 +225,7 @@ async function loadEmployes() {
   loading.value = true
   try {
     const data = await employeService.getAll()
-    if (data && data.length > 0) {
+    if (data) {
       employes.value = data.map(e => ({ ...e, color: e.color || empColor(e.id) }))
     }
   } catch (_) {}
