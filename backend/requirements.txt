@@ -7,3 +7,5 @@ pymongo==4.8.0
 python-dotenv==1.0.1
 werkzeug==3.0.4
 requests==2.32.3
+gunicorn==21.2.0
+eventlet==0.41.1
