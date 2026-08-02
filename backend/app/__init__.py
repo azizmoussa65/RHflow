@@ -54,4 +54,20 @@ def create_app():
     def expired_token(header, payload):
         return jsonify({"message": "Session expirée."}), 401
 
+    # Serve the built Vue frontend (frontend/dist) so the whole app can run behind
+    # a single port in production. In dev, that directory doesn't exist and Vite
+    # serves the frontend separately, so these routes simply won't match anything.
+    frontend_dist = os.path.abspath(os.path.join(app.root_path, "..", "..", "frontend", "dist"))
+
+    @app.get("/", defaults={"path": ""})
+    @app.get("/<path:path>")
+    def serve_frontend(path):
+        target = os.path.join(frontend_dist, path) if path else None
+        if target and os.path.isfile(target):
+            return send_from_directory(frontend_dist, path)
+        index_path = os.path.join(frontend_dist, "index.html")
+        if os.path.isfile(index_path):
+            return send_from_directory(frontend_dist, "index.html")
+        return jsonify({"message": "Frontend non compilé."}), 404
+
     return app

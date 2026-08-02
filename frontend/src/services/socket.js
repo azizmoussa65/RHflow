@@ -1,6 +1,5 @@
 import { io } from 'socket.io-client'
-
-const SOCKET_URL = 'http://localhost:8000'
+import { BACKEND_ORIGIN } from '@/utils/env.js'
 
 let socket = null
 
@@ -8,7 +7,7 @@ export function getSocket() {
   if (socket) return socket
 
   const token = localStorage.getItem('hrflow_token')
-  socket = io(SOCKET_URL, {
+  socket = io(BACKEND_ORIGIN || undefined, {
     auth: { token },
     autoConnect: false,
     transports: ['polling', 'websocket']

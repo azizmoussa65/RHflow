@@ -125,6 +125,7 @@ import { useRoute } from 'vue-router'
 import ModalBase from '@/components/shared/ModalBase.vue'
 import messageService from '@/services/messageService.js'
 import { getSocket } from '@/services/socket.js'
+import { BACKEND_ORIGIN } from '@/utils/env.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { useMessagingStore } from '@/stores/messaging.js'
 
@@ -161,7 +162,7 @@ function avatarColor(id) {
 }
 
 function fileUrl(path) {
-  return path ? `http://localhost:8000/${path}` : ''
+  return path ? `${BACKEND_ORIGIN}/${path}` : ''
 }
 
 function linkify(text) {

@@ -1,4 +1,4 @@
-const BACKEND_ORIGIN = 'http://localhost:8000'
+import { BACKEND_ORIGIN } from './env.js'
 
 /** Full URL for a user's uploaded avatar, or null if they have none. */
 export function avatarUrl(user) {

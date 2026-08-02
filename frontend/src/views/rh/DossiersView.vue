@@ -113,6 +113,7 @@ import { ref, computed, inject, onMounted } from 'vue'
 import ModalBase from '@/components/shared/ModalBase.vue'
 import dossierService from '@/services/dossierService.js'
 import employeService from '@/services/employeService.js'
+import { BACKEND_ORIGIN } from '@/utils/env.js'
 
 const toast = inject('toast')
 const loading = ref(false)
@@ -181,7 +182,7 @@ function telecharger(d) {
     toast.error('Indisponible', "Aucun fichier n'a été joint à ce document.")
     return
   }
-  window.open(`http://localhost:8000/${d.fichierPath}`, '_blank')
+  window.open(`${BACKEND_ORIGIN}/${d.fichierPath}`, '_blank')
 }
 
 async function supprimer(d) {
